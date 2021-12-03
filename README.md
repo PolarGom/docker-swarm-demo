@@ -64,7 +64,7 @@ Login Successed
 # 정상적으로 업로드가 완료되었다면 도커 허브 페이지의 리포지터리에서 확인 가능하다.
 ```
 
-8. 매니저 노드에서 Spring Demo 이미지를 받는다.
+8. 매니저 노드 및 워커 노드에서 Spring Demo 이미지를 받는다.
 
 ```
 [root@~]# docker pull <도커허브 아이디>/<Repository 이름>:spring-demo-0.0.1
