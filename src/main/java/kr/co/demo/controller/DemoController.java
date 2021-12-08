@@ -2,6 +2,8 @@ package kr.co.demo.controller;
 
 import kr.co.demo.common.exception.CommonException;
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -17,6 +19,8 @@ import java.io.InputStreamReader;
  */
 @RestController
 public class DemoController {
+
+    private static final Logger log = LoggerFactory.getLogger(DemoController.class);
 
     /**
      * 호스트 이름 가져오기
@@ -59,6 +63,7 @@ public class DemoController {
             }
         }
 
+        log.info("호스트 이름: {}", result);
 
         return result;
     }

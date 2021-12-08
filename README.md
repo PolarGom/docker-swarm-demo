@@ -110,7 +110,89 @@ CONTAINER ID   IMAGE                                                   COMMAND  
 0c749bb78c9a   <도커허브 아이디>/<Repository 이름>:spring-demo-0.0.1   "java -jar app.jar"   54 minutes ago   Up 54 minutes             spring-demo.2.nl3nb09y377hfdue6wqbp3p3j
 
 # 워커 노드
-[root@~]@ docker ps 
+[root@~]# docker ps 
 CONTAINER ID   IMAGE                                                  COMMAND               CREATED          STATUS          PORTS     NAMES
 afd30091c75e   <도커허브 아이디>/<Repository 이름>:spring-demo-0.0.1   "java -jar app.jar"   38 minutes ago   Up 38 minutes             spring-demo.1.xb3c2e5ew4sbtx13iwwwc2ao6
 ``` 
+
+13. 매니저 노드의 IP Port 로 접근하면 로드 밸런싱이(매니저 및 워커 노드에 둘다 접근 가능) 되는것을 확인 할 수 있다. 워커 노드의 IP Port 로 접근하면 해당 워커 노드에만 접근이 가능하다.([참고 - 라우팅 메쉬](https://docs.docker.com/engine/swarm/ingress/))
+
+---
+### Fluentd 를 이용한 로그 수집
+
+1. 몽고 DB 이미지를 다운 받는다.(mariadb 혹은 다른 DB도 가능하다.)
+
+```
+# 몽고 DB 이미지를 다운 받는다.
+[root@~]# docker pull mongo
+
+# 이미지가 정상적으로 다운받아졌는지 확인한다.
+[root@~]# docker images
+REPOSITORY          TAG                 IMAGE ID       CREATED       SIZE
+mongo               latest              4253856b2570   2 weeks ago   701MB
+```
+
+2. 몽고 DB를 설치한다.
+
+```
+# 도커 컨테이너 생성 및 실행 한다.
+[root@~]# docker run --name mongodb -v ~/data/mongodb:/data/db -d -it -p 27017:27017 mongo
+
+# 정상적으로 생성 및 실행 되었는지 확인한다.
+[root@~]# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                                           NAMES
+7a9235ae63f6   mongo     "docker-entrypoint.s…"   2 seconds ago   Up 2 seconds   0.0.0.0:27017->27017/tcp, :::27017->27017/tcp   mongodb
+```
+
+3. MongoDB Comapss 툴을 이용하여 몽고 DB에 접속 한 후 데이터베이스와 콜렉션 이름을 생성한다.
+
+```
+# 생성한 데이터베이스 이름: docker-logs
+# 생성한 콜렉션 이름: logs
+```
+
+4. fluentd 설정 파일을 생성한다. 설정 파일의 이름은 fluent.conf 로 저장한다.
+
+```
+# 리눅스 해당 경로에 폴더를 생성한다.
+[root@~]# mkdir /data/fluentd-custom-config
+[root@~]# vi fluent.conf
+
+# 아래와 같이 작성 합니다.
+<source>
+    @type forward
+</source>
+<match docker.**>
+    @type mongo
+    database docker-logs
+    collection logs
+    host 192.168.0.175
+    port 27017
+    flush_interval 10s
+</match>
+```
+
+5. fluentd 도커 이미지를 다운 받는다.
+
+```
+# 기존의 fluentd 이미지는 몽고 DB를 연결하는 플러그인이 내장되어 있지않아 아래의 이미지로 다운 받는다.
+[root@~]# docker pull alicek106/fluentd:mongo 
+```
+
+6. fluentd 도커 컨테이너를 생성 한다.
+
+```
+# 볼륨 폴더를 생성한다.
+[root@~]# mkdir /data/fluentd
+
+# 컨테이너를 생성한다.
+[root@~]# docker run -d -it -p 24224:24224 -v /data/fluentd-custom-config/fluent.conf:/fluentd/etc/fluent.conf -e FLUENTD_CONF=fluent.conf --name fluentd alicek106/fluentd:mongo
+```
+
+7. spring-demo 컨테이너를 생성한다.
+
+```
+[root@~]# docker run -d -it -p 9999:9999 --log-driver=fluentd --log-opt fluentd-address=192.168.0.175:24224 --log-opt tag=docker.spring --name spring-demo <도커허브 아이디>/<Repository 이름>:spring-demo-0.0.4
+```
+
+8. MongoDB Comapss 툴을 이용하여 몽고 DB에 접속 한 후 데이터베이스 > 콜렉션에 접속하면 로그가 쌓인것을 확인 할 수 있다.
